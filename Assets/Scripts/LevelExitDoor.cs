@@ -94,7 +94,7 @@ public class LevelExitDoor : MonoBehaviour
     }
 
     /// <summary>
-    /// ✨ 独立高阶动效：在屏幕中央以极具冲击力的带弹性放大动画打出“任务终了”大字，并同步轰出高光音效
+    /// ✨ 独立高阶动效：在屏幕中央以极具冲击力的带弹性放大动画打出“任务终了”大字，并同步轰出高光音效，停留 2 秒后优雅淡出隐藏，把舞台留给玩家欣赏战果
     /// </summary>
     private void ShowMissionCompleteVisual()
     {
@@ -104,17 +104,42 @@ public class LevelExitDoor : MonoBehaviour
         {
             missionCompleteText.SetActive(true);
 
-            // 完美的工业设计：初始本地缩放设为 0，随后用 DOTween 配合 OutBack 弹性曲线放大至正常
+            // 1. 获取文本组件（自适应兼容 TextMeshPro 和普通 Text），用于后续的颜色和透明度控制
+            TMP_Text tmpText = missionCompleteText.GetComponent<TMP_Text>();
+            Text normalText = missionCompleteText.GetComponent<Text>();
+
+            // 2. 初始化状态：强制将文字的 Alpha（不透明度）重置为 1（完全可见），本地缩放设为 0
+            if (tmpText != null) tmpText.color = new Color(tmpText.color.r, tmpText.color.g, tmpText.color.b, 1f);
+            if (normalText != null) normalText.color = new Color(normalText.color.r, normalText.color.g, normalText.color.b, 1f);
+
             missionCompleteText.transform.localScale = Vector3.zero;
-            missionCompleteText.transform.DOScale(Vector3.one, 0.4f)
+
+            // 3. 完美的工业设计：随后用 DOTween 配合 OutBack 弹性曲线在 0.5秒内放大至正常大小
+            missionCompleteText.transform.DOScale(Vector3.one, 0.5f)
                 .SetEase(Ease.OutBack)
                 .SetUpdate(true); // .SetUpdate(true) 极其关键：确保在 SUPERHOT 时间近乎静止时动画也能丝滑播放！
 
-            // 添加音频：自动寻找挂在自己身上的音频组件，并用真实现实时间（不卡顿）瞬间播放通关音效！
+            // 4. ✨【新增淡出流】：让文字在屏幕中央停留3秒，然后用2秒时间优雅地淡出（透明度归 0），淡出完成后彻底关闭物体
+            if (tmpText != null)
+            {
+                tmpText.DOFade(0f, 2f)
+                    .SetDelay(3.0f) // 延迟3秒执行淡出，给玩家充足的视觉停留和欣赏时间
+                    .SetUpdate(true)
+                    .OnComplete(() => missionCompleteText.SetActive(false)); // 淡出完成后，自动关闭物体，保持场景整洁
+            }
+            else if (normalText != null)
+            {
+                normalText.DOFade(0f, 2f)
+                    .SetDelay(3.0f)
+                    .SetUpdate(true)
+                    .OnComplete(() => missionCompleteText.SetActive(false));
+            }
+
+            // 5. 添加音频：自动寻找挂在自己身上的音频组件，并用真实现实时间（不卡顿）瞬间播放通关音效！
             AudioSource audio = GetComponent<AudioSource>();
             if (audio != null && audio.clip != null)
             {
-                // .PlayScheduled 或常规 Play 都可以，但必须确保它能绕过系统 timeScale 的冰冻机制
+                // .Play 配合真实时间，绕过系统 timeScale 的冰冻机制
                 audio.Play();
             }
         }
