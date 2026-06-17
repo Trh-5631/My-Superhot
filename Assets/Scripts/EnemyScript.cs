@@ -105,20 +105,38 @@ public class EnemyScript : MonoBehaviour
     }
     public void Ragdoll()
     {
+        // 【工业级金闸门】：核心拦截防火墙！
+        // 如果在这一帧之前，我已经处于 dead 状态，或者已经被别的子肢体抢先“上报”过死亡了，
+        // 立刻执行 return，绝对拒绝向下执行！防止多重碰撞导致波次计数器雪崩！
+        if (dead) return;
+
+        // 抢先占位，上锁！
+        dead = true;
+
         // 死亡时立刻关闭导航网格，防止尸体死了还会诡异地滑向玩家
         if (agent != null) agent.enabled = false;
-        anim.enabled = false; //
-        BodyPartScript[] parts = GetComponentsInChildren<BodyPartScript>(); //
-        foreach (BodyPartScript bp in parts) //
+        if (anim != null) anim.enabled = false;
+
+        BodyPartScript[] parts = GetComponentsInChildren<BodyPartScript>();
+        foreach (BodyPartScript bp in parts)
         {
-            bp.rb.isKinematic = false; //
-            bp.rb.interpolation = RigidbodyInterpolation.Interpolate; //
+            if (bp.rb != null)
+            {
+                bp.rb.isKinematic = false;
+                bp.rb.interpolation = RigidbodyInterpolation.Interpolate;
+            }
         }
-        dead = true; //
-        if (weaponHolder.GetComponentInChildren<WeaponScript>() != null) //
+
+        if (weaponHolder != null && weaponHolder.GetComponentInChildren<WeaponScript>() != null)
         {
-            WeaponScript w = weaponHolder.GetComponentInChildren<WeaponScript>(); //
-            w.Release(); //
+            WeaponScript w = weaponHolder.GetComponentInChildren<WeaponScript>();
+            w.Release();
+        }
+
+        // 只有成功突破上方 `if (dead)` 防火墙的第一帧，才有资格向管理器发送【唯一一次】死讯传真
+        if (SpawnManager.instance != null)
+        {
+            SpawnManager.instance.OnEnemyKilled();
         }
     }
 

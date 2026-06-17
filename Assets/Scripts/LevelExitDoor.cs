@@ -173,25 +173,27 @@ public class LevelExitDoor : MonoBehaviour
 
     /// <summary>
     /// 高阶算法：实时扫描全图带有 "Enemy" 标签的布娃娃或活体
+    /// 解耦算法：直接与全局刷怪管理器对接，验证多波次防火墙是否全部解禁
     /// </summary>
     private bool AreEnemiesStillAlive()
     {
-        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+        // 1. 如果场景里存在刷怪管理器，一切以刷怪管理器数出来的波次死活为最高准则
+        if (SpawnManager.instance != null)
+        {
+            return !SpawnManager.instance.IsAllWavesCleared();
+        }
 
+        // 2. 备用安全降落伞：如果别的地图没放 SpawnManager，则自动退回到老版的纯标签扫描
+        GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
         foreach (GameObject enemyObj in enemies)
         {
-            // 扫描敌人身上挂载的 EnemyScript
             EnemyScript enemyScript = enemyObj.GetComponentInParent<EnemyScript>();
-            if (enemyScript != null)
+            if (enemyScript != null && !enemyScript.dead)
             {
-                // 如果发现有任何一个敌人 dead 变量不为 true，说明还有活口
-                if (!enemyScript.dead)
-                {
-                    return true;
-                }
+                return true;
             }
         }
-        return false; // 全图搜完，没有活着的敌人
+        return false;
     }
 
     /// <summary>
