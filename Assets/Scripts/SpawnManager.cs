@@ -6,11 +6,23 @@ public class SpawnManager : MonoBehaviour
 {
     public static SpawnManager instance;
 
+    // ==================== ✨ 新增：单个敌人的精准刷新指令 ====================
+    [System.Serializable]
+    public class SpawnCommand
+    {
+        [Tooltip("该名敌人专属的刷新位置（从层级面板把具体的 Point 拖进来）")]
+        public Transform spawnPoint;
+        [Tooltip("该位置要刷出的敌人专属预制件（远程拖远程Prefab，近战拖近战Prefab）")]
+        public GameObject specificEnemyPrefab;
+    }
+    // ========================================================================
+
     [System.Serializable]
     public class Wave
     {
-        [Tooltip("该波次要刷出的敌人总数")]
-        public int enemyCount;
+        // ✨ 已重构：波次里的敌人数量直接由配置的“精准指令列表”数量决定
+        [Tooltip("配置该波次中每一个敌人的位置和兵种Prefab（点加号自由添加）")]
+        public List<SpawnCommand> spawnCommands;
         [Tooltip("刷每名敌人之间的间隔（正常时间下）")]
         public float spawnInterval = 0.5f;
     }
@@ -22,12 +34,17 @@ public class SpawnManager : MonoBehaviour
     public float waveDelay = 3.0f;
 
     [Header("References")]
-    [Tooltip("敌人的预制件（Prefab）")]
-    public GameObject enemyPrefab;
     [Tooltip("刚刚制作的红色预警圆柱体预制件")]
     public GameObject indicatorPrefab;
     [Tooltip("把场景里的 SpawnPointsGroup 拖进来，脚本会自动提取所有子物体作为刷怪位")]
     public Transform spawnPointsGroup;
+
+    // ====================  新增：多波次预警音效配置 ====================
+    [Header("Audio Settings")]
+    [Tooltip("新波次拉响警报时的本地音频剪辑")]
+    public AudioClip waveWarningSound;
+    private AudioSource audioSource;
+    // ===================================================================
 
     private int currentWaveIndex = 0;
     private bool isWaveSpawning = false;
@@ -38,6 +55,15 @@ public class SpawnManager : MonoBehaviour
     void Awake()
     {
         instance = this;
+
+        // 自动挂载或获取音频源组件，用来播放预警音效
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+        // 工业标准：确保预警音效是全场通告的2D音效，且不随距离衰减
+        audioSource.spatialBlend = 0f;
     }
 
     void Start()
@@ -82,7 +108,6 @@ public class SpawnManager : MonoBehaviour
 
     /// <summary>
     /// 核心协程：控制波次延迟、发射地面刷新预警，并克隆出实体红人
-    /// ✨ 已重构：引入 Fisher-Yates 洗牌算法，确保一个点位绝对只刷一个敌人，不产生位置堆叠
     /// </summary>
     IEnumerator StartNextWaveRoutine()
     {
@@ -91,34 +116,29 @@ public class SpawnManager : MonoBehaviour
         // 确定当前要跑的是配置列表里的第几波
         int configIndex = (aliveEnemiesInCurrentWave == 0 && currentWaveIndex > 0) ? currentWaveIndex - 1 : currentWaveIndex;
         Wave wave = waves[configIndex];
-        aliveEnemiesInCurrentWave = wave.enemyCount;
+
+        // ✨ 该波次要击杀的人数等于配置的指令总数
+        aliveEnemiesInCurrentWave = wave.spawnCommands.Count;
 
         Debug.Log($"<color=cyan>【波次系统】</color> 第 {currentWaveIndex + 1} 波即将到来，正在分派不重复的点位...");
 
-        // 1. ✨【高水准洗牌算法】：复制一份点位列表，将其顺序彻底打乱
-        List<Transform> shuffledPoints = new List<Transform>(spawnPoints);
-        for (int i = 0; i < shuffledPoints.Count; i++)
+        // ====================  新增：高精度预警音效触发 ====================
+        // 当红柱子亮起的绝对第一帧，跨越时间流速限制，完美播放提示音效
+        if (audioSource != null && waveWarningSound != null)
         {
-            Transform temp = shuffledPoints[i];
-            int randomIndex = Random.Range(i, shuffledPoints.Count);
-            shuffledPoints[i] = shuffledPoints[randomIndex];
-            shuffledPoints[randomIndex] = temp;
+            // 在 SUPERHOT 开发中，由于时间缩放，必须通过调整 pitch（或者由全局管理器特殊控制）
+            // 如果你发现声音跟着变慢，可以取消下面这行的注释强制原速播放：
+            // audioSource.pitch = 1f / Time.timeScale; 
+            audioSource.PlayOneShot(waveWarningSound);
         }
+        // ===================================================================
 
-        // 2. ✨【安全边界拦截】：如果配置的刷怪数大于你的点位总数，防止数组越界
-        int actualSpawnCount = Mathf.Min(wave.enemyCount, shuffledPoints.Count);
-        if (wave.enemyCount > shuffledPoints.Count)
+        // 1. 依次在指令指定的专属点位上，先生成警告虚影
+        foreach (SpawnCommand cmd in wave.spawnCommands)
         {
-            Debug.LogError($"⚠️ 警告：当前波次配置的敌人数量({wave.enemyCount})超过了场景里的刷怪点总数({shuffledPoints.Count})！已自动拦截堆叠。");
-        }
-
-        // 3. 依次在各不相同的专属点位上，先生成警告虚影
-        for (int i = 0; i < actualSpawnCount; i++)
-        {
-            Transform p = shuffledPoints[i];
-            if (indicatorPrefab != null)
+            if (cmd.spawnPoint != null && indicatorPrefab != null)
             {
-                GameObject ind = Instantiate(indicatorPrefab, p.position, Quaternion.identity);
+                GameObject ind = Instantiate(indicatorPrefab, cmd.spawnPoint.position, Quaternion.identity);
                 // 使用真实现实时间销毁预警物体，防止受到 SUPERHOT 慢动作影响导致警告框迟迟不走
                 Destroy(ind, waveDelay);
             }
@@ -127,28 +147,28 @@ public class SpawnManager : MonoBehaviour
         // 给玩家留出配置的 waveDelay（喘息/预警时间）
         yield return new WaitForSecondsRealtime(waveDelay);
 
-        // 4. 正式下放实体敌人，一个坑点绝对只下一个兵
-        for (int i = 0; i < actualSpawnCount; i++)
+        // 2. 正式下放实体敌人，一个坑点绝对只下一个兵
+        foreach (SpawnCommand cmd in wave.spawnCommands)
         {
-            Transform p = shuffledPoints[i];
-            if (enemyPrefab != null)
+            if (cmd.spawnPoint != null && cmd.specificEnemyPrefab != null)
             {
-                // ==================== ✨ 新增：自动化防呆下压射线贴地系统 ====================
-                // 抓取当前刷怪点的基础坐标
-                Vector3 spawnPosition = p.position;
+                //  自动化防呆下压射线贴地系统
+                Vector3 spawnPosition = cmd.spawnPoint.position;
                 RaycastHit hit;
 
-                // 从点位上方 1 米处向下发射一条 10 米长的射线，探测真正的地板物理碰撞表面
                 if (Physics.Raycast(spawnPosition + Vector3.up * 1f, Vector3.down, out hit, 10f))
                 {
-                    // 如果射中地板，强制将刷怪高度重置为地板的真实 Y 轴高度，完美解决悬空问题！
                     spawnPosition.y = hit.point.y;
                 }
-                // ============================================================================
 
-                // 实例化敌人时，使用修正后的贴地坐标 spawnPosition 替代原先可能悬空的 p.position
-                Instantiate(enemyPrefab, spawnPosition, p.rotation);
+                // ✨ 核心魔改：实例化对应的独立敌人预制件
+                Instantiate(cmd.specificEnemyPrefab, spawnPosition, cmd.spawnPoint.rotation);
             }
+            else if (cmd.spawnPoint != null)
+            {
+                Debug.LogError("⚠️ 发现未配置完全的刷怪指令！请检查特定的 Enemy Prefab 是否漏拖了。");
+            }
+
             // 敌人相互之间带有轻微的间隔，防止由于同帧生成发生卡模型引发物理弹飞
             yield return new WaitForSeconds(wave.spawnInterval);
         }
