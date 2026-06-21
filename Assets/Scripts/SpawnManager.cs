@@ -2,10 +2,22 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+
+
 public class SpawnManager : MonoBehaviour
 {
     public static SpawnManager instance;
-
+    [Header("✨ 关卡开局剧情定制")]
+    [Tooltip("是否在关卡开局时触发看板娘对话")]
+    public bool triggerDialogueOnStart = true;
+    [Tooltip("开局说话人的名字")]
+    public string openingSpeakerName = "引导员";
+    [Tooltip("本关独有的开局台词内容")]
+    [TextArea(2, 5)] // 让编辑器里的输入框变大，方便写小作文
+    public string openingDialogueContent = "进入第二关战场。检测到前方出现高能近战反应，敌人已拔刀，请保持移动！";
+    [Tooltip("开局台词对应的表情")]
+    public DialogueManager.PortraitExpression openingExpression = DialogueManager.PortraitExpression.Default;
+    
     // ==================== ✨ 新增：单个敌人的精准刷新指令 ====================
     [System.Serializable]
     public class SpawnCommand
@@ -104,6 +116,11 @@ public class SpawnManager : MonoBehaviour
         {
             allWavesCleared = true;
         }
+
+        if (triggerDialogueOnStart && DialogueManager.instance != null)
+        {
+            DialogueManager.instance.ShowDialogue(openingSpeakerName, openingDialogueContent, openingExpression);
+        }
     }
 
     /// <summary>
@@ -193,13 +210,24 @@ public class SpawnManager : MonoBehaviour
             if (currentWaveIndex < totalExpectedWaves)
             {
                 StartCoroutine(StartNextWaveRoutine());
+
+                if (DialogueManager.instance != null)
+                {
+                    DialogueManager.instance.ShowDialogue("奈珂", "警告：检测到敌方增援正在传送，注意隐蔽，消灭他们！", DialogueManager.PortraitExpression.Warning);
+                }
             }
             // B. 如果这就是最后一波：彻底解放，关卡防火墙宣布正式解禁！
             else
             {
                 allWavesCleared = true;
-                Debug.Log("<color=green>【波次系统】</color> 最后一波敌人已被全歼！通关封锁解除！");
+                Debug.Log("<color=green>【波次系统】</color> 最后一波敌人已被全歼！通关封锁解除！");      
+                
+                if (DialogueManager.instance != null)
+                {
+                DialogueManager.instance.ShowDialogue("奈珂", "威胁已安全清除，检测到大门已开启。干得好，我就知道我没看错你。", DialogueManager.PortraitExpression.Victory);
+                }
             }
+
         }
     }
 
