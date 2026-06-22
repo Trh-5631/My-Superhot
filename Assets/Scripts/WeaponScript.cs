@@ -16,8 +16,14 @@ public class WeaponScript : MonoBehaviour
     public bool active = true;
     public bool reloading;
 
+    // ==================== ✨【核心修复：投掷伤害状态锁】====================
+    [HideInInspector]
+    [Tooltip("标记该武器当前是否处于玩家主动投掷出手的致命飞行状态，用于绝杀地上蹭刀的地刺 Bug")]
+    public bool canHarm = false;
+    // =======================================================================
+
     private Rigidbody rb;
-    private Collider collider;
+    private new Collider collider; // 修复原有隐藏基类成员的关键字警告
     private new Renderer renderer;
 
     // ==================== 武士刀新增变量 ====================
@@ -206,12 +212,19 @@ public class WeaponScript : MonoBehaviour
         s.AppendCallback(() => rb.AddTorque(transform.transform.right + transform.transform.up * 20, ForceMode.Impulse));
         //  投掷出枪械后，立刻把屏幕正中心的斜杠 HUD 清空关闭
         s.AppendCallback(() => { if (ammoHUDText != null) ammoHUDText.text = ""; });
+
+        // ✨【核心注入】：玩家脱手飞刀/飞枪的瞬间，激活伤害使能状态锁。
+        // 从而完美避开 SUPERHOT 因时停导致 relativeVelocity 物理计数极小的问题！
+        s.AppendCallback(() => canHarm = true);
     }
 
     public void Pickup()
     {
         if (!active)
             return;
+
+        // ✨ 玩家重新捡起武器时，安全关闭投掷伤害锁
+        canHarm = false;
 
         SuperHotScript.instance.weapon = this;
         ChangeSettings();
@@ -227,6 +240,9 @@ public class WeaponScript : MonoBehaviour
     public void Release()
     {
         active = true;
+        // ✨ 敌人死后自然掉落的武器没有砸人伤害，强制关闭锁
+        canHarm = false;
+
         transform.parent = null;
         rb.isKinematic = false;
         rb.interpolation = RigidbodyInterpolation.Interpolate;
@@ -248,8 +264,14 @@ public class WeaponScript : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        // 飞刀/飞枪砸人逻辑：武士刀掷出砸到敌人时，完全复用此处的碰撞致死逻辑
-        if (collision.gameObject.CompareTag("Enemy") && collision.relativeVelocity.magnitude < 15)
+        // 1. 如果碰到了玩家本体(Player)或者武器持有者，直接无视，防止离手瞬间自我擦边误杀状态锁
+        if (collision.gameObject.CompareTag("Player") || collision.gameObject.name.Contains("Player"))
+        {
+            return;
+        }
+
+        // 2. 核心判定：只有当处于致命投掷状态，且切实砸中了敌人
+        if (canHarm && collision.gameObject.CompareTag("Enemy"))
         {
             BodyPartScript bp = collision.gameObject.GetComponent<BodyPartScript>();
 
@@ -261,6 +283,17 @@ public class WeaponScript : MonoBehaviour
                 bp.HidePartAndReplace();
                 if (bp.enemy != null) bp.enemy.Ragdoll();
             }
+
+            // ✨【命中反馈】：既然已经成功砸中并击杀了敌人，这把刀的使命完成，当帧关闭伤害锁
+            canHarm = false;
+            return;
+        }
+
+        // 3. ✨【落地凡铁安全线】：如果砸中的既不是玩家，也不是敌人（那必然是墙壁、天花板、地面或障碍物）
+        // 这说明玩家这发飞刀彻底“脱靶/砸空”了。此时它落在了地上，我们正式关闭伤害锁，防止它变成地刺！
+        if (collision.gameObject.CompareTag("Untagged") || collision.gameObject.layer == LayerMask.NameToLayer("Default") || collision.gameObject.name.Contains("Ground") || collision.gameObject.name.Contains("Wall"))
+        {
+            canHarm = false;
         }
     }
 }

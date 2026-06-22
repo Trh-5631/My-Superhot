@@ -34,6 +34,23 @@ public class BodyPartScript : MonoBehaviour
         if (enemy != null && !enemy.dead)
         {
             enemy.Ragdoll();
+
+            // ✨【新增核心拦截】：在敌人散架触发 OnEnemyKilled 之前，去验证这是否是最后一个人！
+            // 工业级判定：如果场景里有刷怪器，并且当前活着的人数刚好等于 1（就是眼前这个正在被打碎的倒霉蛋）
+            if (SpawnManager.instance != null && SpawnManager.instance.IsAllWavesCleared() == false)
+            {
+                // ⚠️ 重点推敲：需要配合你在 SpawnManager 里的存活总人数变量
+                // 假设你的 SpawnManager 里记录存活人数的变量是 aliveEnemiesInCurrentWave
+                // 如果目前只剩这最后 1 个怪了，且目前是最后一波
+                if (SpawnManager.instance.waves.Count > 0 && SpawnManager.instance.IsLastEnemyLeft()) 
+                {
+                    if (KillcamManager.instance != null)
+                    {
+                        // 传入当前的肢体部位 transform，回放飞出去的碎尸残片
+                        KillcamManager.instance.TriggerKillcam(this.transform);
+                    }
+                }
+            }
         }
 
         if (bodyPartRenderer != null)

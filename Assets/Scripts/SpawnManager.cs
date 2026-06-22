@@ -238,4 +238,37 @@ public class SpawnManager : MonoBehaviour
     {
         return allWavesCleared;
     }
+
+    /// <summary>
+    /// ✨ 物理层精准判定：扫描全图活着的敌人组件，杜绝计数器时序导致的提前触发 Bug
+    /// </summary>
+    public bool IsLastEnemyLeft()
+    {
+        // 1. 安全锁：如果当前根本就不是最后一波，直接拒绝触发回放
+        int totalExpectedWaves = waves.Count + 1;
+        bool isLastWave = (currentWaveIndex >= totalExpectedWaves - 1);
+        if (!isLastWave) return false;
+
+        // 2. 扫描全场景所有的敌人组件
+        EnemyScript[] allEnemies = Object.FindObjectsByType<EnemyScript>(FindObjectsSortMode.None);
+
+        int aliveCount = 0;
+        string debugNames = ""; // 记录到底是谁还活着
+
+        foreach (EnemyScript e in allEnemies)
+        {
+            // 只有属于当前活跃场景、且没有死亡的敌人，才算作活体
+            if (e != null && !e.dead && e.gameObject.scene.IsValid())
+            {
+                aliveCount++;
+                debugNames += e.gameObject.name + " (活) | ";
+            }
+        }
+
+        // 3. 核心逻辑：因为当前正被打碎的这个敌人此时“还没有”变成 dead = true，
+        // 所以如果全图活着的敌人生态总数刚好等于 1（就是眼前的这最后一只），
+        // 那么它就百分之百是全场最后一个倒霉蛋！
+        Debug.Log($"<color=red>【回放判定流】</color> 当前数出的活人总数: {aliveCount} 个。 它们分别是: {debugNames}");
+        return aliveCount == 1;
+    }
 }
