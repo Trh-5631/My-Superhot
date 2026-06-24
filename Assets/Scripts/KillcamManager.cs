@@ -12,7 +12,7 @@ public class KillcamManager : MonoBehaviour
     [Tooltip("回放期间强制的固定时间缩放值（极慢动作，推荐 0.02 - 0.05）")]
     public float killcamTimeScale = 0.05f;
 
-    [Header("电影级运镜参数可调面板")]
+    [Header("🎬 电影级运镜参数可调面板")]
     [Tooltip("回放相机距离敌人身体中心的水平距离（观察半径）")]
     public float cameraDistance = 2.5f;
     [Tooltip("回放相机高出敌人头顶/身体的高度偏移")]
@@ -21,6 +21,12 @@ public class KillcamManager : MonoBehaviour
     public float rotationSpeed = 25.0f;
     [Tooltip("镜头看向敌人身体的垂直偏移（例如看向胸口还是脚底，1.0代表看向胸口左右）")]
     public float lookAtHeightOffset = 1.0f;
+
+    // ==================== ✨【电影级低通滤波器参数】====================
+    [Header("🎵 黑客帝国式闷音特效配置")]
+    [Tooltip("回放期间的低通截止频率。数值越低听起来越闷（推荐 700 - 1200）")]
+    public float killcamAudioCutoff = 900f;
+    // ===================================================================
 
     private Camera mainCamera;
     private Camera clonedKillcamCamera; // 动态克隆出的回放相机
@@ -63,20 +69,20 @@ public class KillcamManager : MonoBehaviour
         clonedObj.name = "Dynamic_KillcamCamera";
         clonedKillcamCamera = clonedObj.GetComponent<Camera>();
 
-        // ==================== 【新增：绝杀 AI 目标劫持防御线】====================
+        // ==================== 【绝杀 AI 目标劫持防御线】====================
         // 强行把克隆出来的相机 Tag 改为 Untagged（未标记）！
-        // 这样 Unity 的 Camera.main 或者 FindWithTag 就绝对找不到它，敌人 AI 就不会被它勾引走！
         clonedObj.tag = "Untagged";
-        // ==========================
+        // ===================================================================
 
-        // 防坑必加：移除克隆体身上残留的玩家控制脚本、音频监听器等
+        // 移除克隆体身上残留的玩家控制脚本等（保留音频监听器）
         Component[] allComponents = clonedObj.GetComponents<Component>();
         foreach (var comp in allComponents)
         {
             if (comp is Transform || comp is Camera || comp.GetType().Name.Contains("Camera"))
                 continue;
 
-            if (comp is AudioListener || comp.GetType().Name.Contains("Look") || comp.GetType().Name.Contains("Controller"))
+            // 剔除 AudioListener，允许克隆相机保留听觉
+            if (comp.GetType().Name.Contains("Look") || comp.GetType().Name.Contains("Controller"))
             {
                 Destroy(comp);
             }
@@ -85,15 +91,31 @@ public class KillcamManager : MonoBehaviour
         // 3. 配置相机初始状态
         clonedKillcamCamera.gameObject.SetActive(true);
 
-        // ✨【自适应动态对齐】：利用面板配置的 cameraDistance 和 cameraHeightOffset 计算初始坐标
-        // 让相机在敌人的正后方（或由你定义的 forward 方向）拉开物理距离
+        // 如果主相机的克隆体由于某些特殊原因没有携带 AudioListener，在此处兜底补上
+        if (clonedObj.GetComponent<AudioListener>() == null)
+        {
+            clonedObj.AddComponent<AudioListener>();
+        }
+
+        // ==================== ✨【新增：黑客帝国闷音特效线】====================
+        // 动态给回放相机挂载低通滤波器组件
+        AudioLowPassFilter lowPass = clonedObj.GetComponent<AudioLowPassFilter>();
+        if (lowPass == null)
+        {
+            lowPass = clonedObj.AddComponent<AudioLowPassFilter>();
+        }
+        // 将截止频率设定为低频，高频的清脆声被砍掉，瞬间产生极其压抑、厚重的潜水/时空凝固闷音感
+        lowPass.cutoffFrequency = killcamAudioCutoff;
+        // =======================================================================
+
+        // 【自适应动态对齐】：利用面板配置的 cameraDistance 和 cameraHeightOffset 计算初始坐标
         Vector3 initialDirection = -enemyTransform.forward;
         if (initialDirection == Vector3.zero) initialDirection = Vector3.back; // 容错处理
 
         clonedKillcamCamera.transform.position = enemyTransform.position + (initialDirection * cameraDistance) + (Vector3.up * cameraHeightOffset);
         clonedKillcamCamera.transform.LookAt(enemyTransform.position + Vector3.up * lookAtHeightOffset);
 
-        // 关闭主相机渲染
+        // 关闭主相机渲染（主相机的正常耳朵关闭，克隆相机带滤波器的耳朵接管）
         mainCamera.gameObject.SetActive(false);
 
         // 4. 电影级运镜：围绕碎裂的肢体作精准轨道旋转
@@ -104,7 +126,7 @@ public class KillcamManager : MonoBehaviour
 
             if (clonedKillcamCamera != null && enemyTransform != null)
             {
-                // ✨【参数映射】：通过面板上的 rotationSpeed 来控制相机的环绕速度
+                // 【参数映射】：通过面板上的 rotationSpeed 来控制相机的环绕速度
                 clonedKillcamCamera.transform.RotateAround(enemyTransform.position, Vector3.up, rotationSpeed * Time.unscaledDeltaTime);
 
                 // 确保相机始终死死盯着敌人指定的身体高度
@@ -116,7 +138,7 @@ public class KillcamManager : MonoBehaviour
         // 5. 回放结束，归还主相机与系统流速控制权
         if (mainCamera != null) mainCamera.gameObject.SetActive(true);
 
-        // 彻底销毁克隆相机，保持干净
+        // 彻底销毁克隆相机（随之销毁其身上的低通滤波器和临时耳朵，音效瞬间恢复清脆高昂）
         if (clonedObj != null) Destroy(clonedObj);
 
         // 重新恢复 SuperHot 的机制
