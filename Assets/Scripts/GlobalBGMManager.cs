@@ -1,35 +1,115 @@
+ï»¿using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(AudioSource))]
 public class GlobalBGMManager : MonoBehaviour
 {
-    // È«¾Ö¾²Ì¬ÊµÀı£¬·½±ãºóĞø¿ÉÄÜĞèÒªµÄÒôÁ¿¿ØÖÆ»ò¾²Òô²Ù×÷
     private static GlobalBGMManager _instance;
+    public static GlobalBGMManager Instance => _instance; // æš´éœ²å•ä¾‹æ¥å£ï¼Œæ–¹ä¾¿ä¸»ç•Œé¢è°ƒç”¨
 
-    [Header("Audio Settings")]
-    [Tooltip("ÍÏÈëÓÃÓÚÈ«¾ÖÑ­»·²¥·ÅµÄÕ½¶·BGM")]
+    [Header("éŸ³é¢‘æºé…ç½®")]
+    [Tooltip("æ‹–å…¥ç”¨äºå…¨å±€å¾ªç¯æ’­æ”¾çš„æˆ˜æ–—BGM (AudioSource)")]
     public AudioSource musicSource;
+    [Tooltip("æ‹–å…¥ä¸“é—¨ç”¨äºä¸»ç•Œé¢çš„BGM (AudioSource)")]
+    public AudioSource mainMenuSource;
+    [Header("æ·¡å…¥æ·¡å‡ºè®¾ç½®")]
+    [Tooltip("éŸ³ä¹æ·¡å˜çš„æ—¶é—´ï¼ˆç§’ï¼‰ï¼Œ0.8 - 1.2ç§’æœ€èˆ’é€‚")]
+    public float fadeDuration = 1.0f;
+
+    private float targetBattleVolume;
 
     void Awake()
     {
-        // 1. µ¥Àı»úÖÆ¼ì²â£ºÈ·±£Õû¸öÓÎÏ·ÉúÃüÖÜÆÚÖĞ£¬ÓĞÇÒ½öÓĞÒ»¸ö BGM ¿ØÖÆÆ÷´æÔÚ
+        // 1. å•ä¾‹æœºåˆ¶æ£€æµ‹ï¼šç¡®ä¿æ•´ä¸ªæ¸¸æˆç”Ÿå‘½å‘¨æœŸä¸­ï¼Œæœ‰ä¸”ä»…æœ‰ä¸€ä¸ª BGM æ§åˆ¶å™¨å­˜åœ¨
         if (_instance != null && _instance != this)
         {
-            // Èç¹û´ËÎïÌå±»ÖØ¸´´´½¨£¨ÀıÈçÍæ¼Ò´ÓµÚ2¹ØËÀµôÖØĞÂ»Øµ½µÚ1¹Ø£¬µ¼ÖÂ³õÊ¼¹Ø¿¨±»ÖØĞÂ¼ÓÔØ£©
-            // ÔòÁ¢¿ÌÏú»ÙÕâ¸öĞÂµ®ÉúµÄ¸´ÖÆÆ·£¬·ÀÖ¹¶àÊ×ÒôÀÖÖØµş²¥·Å
             Destroy(gameObject);
             return;
         }
 
-        // 2. È·Á¢Î¨Ò»ÊµÀı
+        // 2. ç¡®ç«‹å”¯ä¸€å®ä¾‹å¹¶ç§»å…¥ä¿æŠ¤åŒº
         _instance = this;
-
-        // 3. ºËĞÄ»úÖÆ£º½«´ËÎïÌåÒÆÈë DontDestroyOnLoad Òş²Ø±£»¤Çø
-        // Ê¹Æä³¹µ×ÍÑÀë³£¹æ³¡¾°ÇĞ»»µÄÏú»ÙÖÜÆÚ£¬ÊµÏÖÁ¬Ğø²»ÖĞ¶Ï²¥·Å
         DontDestroyOnLoad(gameObject);
 
-        // Èİ´í´¦Àí£ºÈç¹ûÔÚ Inspector Ãæ°åÍü¼ÇÍÏÈë£¬Ôò×Ô¶¯»ñÈ¡±¾µØ×é¼ş
-        if (musicSource == null)
-            musicSource = GetComponent<AudioSource>();
+        // å®¹é”™å¤„ç†
+        if (musicSource == null) musicSource = GetComponent<AudioSource>();
+    }
+
+    void Start()
+    {
+        // è®°å½•ä½ åœ¨ Inspector é‡Œç»™æˆ˜æ–— BGM è®¾å®šçš„åˆå§‹éŸ³é‡ä¸Šé™
+        if (musicSource != null) targetBattleVolume = musicSource.volume;
+
+        // åˆå§‹åŒ–ï¼šå¦‚æœæˆ‘ä»¬åœ¨ä¸»ç•Œé¢åœºæ™¯å¯åŠ¨
+        if (mainMenuSource != null)
+        {
+            mainMenuSource.loop = true;
+            mainMenuSource.Play(); // ä¸»ç•Œé¢éŸ³ä¹ç›´æ¥æ‹‰æ»¡æ’­æ”¾
+        }
+
+        // æˆ˜æ–— BGM å…ˆé—­å˜´ï¼Œç­‰å¾…ç‚¹å‡»å¼€å§‹æ¸¸æˆ
+        if (musicSource != null)
+        {
+            musicSource.volume = 0f;
+            musicSource.Stop();
+        }
+    }
+
+    /// <summary>
+    /// âœ¨ æ ¸å¿ƒè§¦å‘å™¨ï¼šå½“ç©å®¶ç‚¹å‡»ä¸»èœå•çš„â€œå¼€å§‹æ¸¸æˆâ€æ—¶ï¼Œä¸»èœå•è„šæœ¬è°ƒç”¨æ­¤å‡½æ•°
+    /// </summary>
+    public void TriggerMenuToBattleFade()
+    {
+        StartCoroutine(FadeMenuToBattleRoutine());
+    }
+
+    /// <summary>
+    /// â³ åç¨‹ï¼šä¼˜é›…çš„ä¸»ç•Œé¢éŸ³ä¹æ·¡å‡º â”€â”€> æˆ˜æ–—éŸ³ä¹æ·¡å…¥
+    /// </summary>
+    private IEnumerator FadeMenuToBattleRoutine()
+    {
+        float timer = 0f;
+
+        // ç¡®ä¿æˆ˜æ–—BGMåœ¨é™éŸ³çŠ¶æ€ä¸‹å…ˆè·‘èµ·æ¥ï¼Œå‡†å¤‡æ¥æ£’
+        if (musicSource != null)
+        {
+            musicSource.volume = 0f;
+            musicSource.loop = true;
+            musicSource.Play();
+        }
+
+        // ã€ç¬¬ä¸€é˜¶æ®µï¼šåŒå‘äº¤ç»‡æ·¡å˜ã€‘åœ¨ fadeDuration æ—¶é—´å†…ï¼Œä¸€ä¸ªå˜å°ï¼Œä¸€ä¸ªå˜å¤§
+        while (timer < fadeDuration)
+        {
+            timer += Time.unscaledDeltaTime; // ä½¿ç”¨æ— è§†æ—¶é—´å‡é€Ÿçš„çœŸå®æ—¶é—´ï¼Œé˜²æ­¢SUPERHOTæœºåˆ¶å¹²æ‰°
+            float progress = timer / fadeDuration;
+
+            // ä¸»ç•Œé¢ BGM çº¿æ€§æ·¡å‡º
+            if (mainMenuSource != null)
+            {
+                mainMenuSource.volume = Mathf.Lerp(1f, 0f, progress);
+            }
+
+            // æˆ˜æ–— BGM çº¿æ€§æ·¡å…¥
+            if (musicSource != null)
+            {
+                musicSource.volume = Mathf.Lerp(0f, targetBattleVolume, progress);
+            }
+
+            yield return null;
+        }
+
+        // ã€ç¬¬äºŒé˜¶æ®µï¼šæ–©è‰é™¤æ ¹ã€‘å½»åº•å…³é—­ä¸»ç•Œé¢éŸ³é¢‘æºï¼Œç¡®ä¿éŸ³é‡ä¸¥æ ¼æ ¡å‡†
+        if (mainMenuSource != null)
+        {
+            mainMenuSource.Stop();
+            mainMenuSource.volume = 0f;
+        }
+
+        if (musicSource != null)
+        {
+            musicSource.volume = targetBattleVolume;
+        }
     }
 }

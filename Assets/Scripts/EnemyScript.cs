@@ -42,16 +42,26 @@ public class EnemyScript : MonoBehaviour
     {
         if (dead)
             return;
+
+        // 🚨【安全锁拦截】：获取当前主相机并进行安全检查
+        Camera mainCam = Camera.main;
+        if (mainCam == null)
+        {
+            // 如果触发了死亡回放（Killcam）导致主相机被隐藏/销毁，立刻安全返回，防止闪退报错
+            if (agent != null && agent.enabled) agent.isStopped = true;
+            return;
+        }
+
         // 无论哪种敌人，活着时都要在水平方向死死盯住玩家
-        transform.LookAt(new Vector3(Camera.main.transform.position.x, transform.position.y, Camera.main.transform.position.z));
+        transform.LookAt(new Vector3(mainCam.transform.position.x, transform.position.y, mainCam.transform.position.z));
         // ==================== AI 行为决策机 ====================
         if (enemyType == EnemyType.Melee && agent != null && agent.enabled)
         {
             // 实时将玩家的当前坐标设为导航终点
-            agent.SetDestination(Camera.main.transform.position);
+            agent.SetDestination(mainCam.transform.position);
             // 计算敌人与玩家之间的水平距离
             float distanceToPlayer = Vector3.Distance(new Vector3(transform.position.x, 0, transform.position.z),
-            new Vector3(Camera.main.transform.position.x, 0, Camera.main.transform.position.z));
+            new Vector3(mainCam.transform.position.x, 0, mainCam.transform.position.z));
             // 判断是否进入了攻击范围
             if (distanceToPlayer <= attackRange)
             {
@@ -64,7 +74,7 @@ public class EnemyScript : MonoBehaviour
                 // 频率控制器：使用真实时间戳判定（防止 SUPERHOT 时间减速导致计时器抽风）
                 if (Time.time >= nextAttackTime)
                 {
-                    PerformMeleeAttack();
+                    PerformMeleeAttack(mainCam); // 传递健康的相机引用
                     nextAttackTime = Time.time + attackRate;
                 }
             }
@@ -79,9 +89,9 @@ public class EnemyScript : MonoBehaviour
     }
 
     // ==================== 新增：近战敌人挥砍逻辑 ====================
-    void PerformMeleeAttack()
+    void PerformMeleeAttack(Camera targetCam)
     {
-        if (dead) return;
+        if (dead || targetCam == null) return;
         // 1. 触发敌人的挥砍动画（原项目动画控制器中若有开火动作，可以直接复用或触发 Trigger）
         if (anim != null)
         {
@@ -90,7 +100,7 @@ public class EnemyScript : MonoBehaviour
         // 2. 发射伤害射线：从敌人胸口向玩家方向刺出一击
         RaycastHit hit;
         Vector3 rayStart = transform.position + Vector3.up * 1.2f; // 敌人胸口高度
-        Vector3 rayDir = (Camera.main.transform.position - rayStart).normalized;
+        Vector3 rayDir = (targetCam.transform.position - rayStart).normalized;
 
         if (Physics.Raycast(rayStart, rayDir, out hit, attackRange))
         {

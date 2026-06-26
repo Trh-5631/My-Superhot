@@ -9506,7 +9506,7 @@ PrefabInstance:
     - target: {fileID: 7023552090390678838, guid: a840285791324d641afea66c0d7af00c,
         type: 3}
       propertyPath: killcamAudioCutoff
-      value: 1100
+      value: 1000
       objectReference: {fileID: 0}
     - target: {fileID: 7023552090390678838, guid: a840285791324d641afea66c0d7af00c,
         type: 3}
