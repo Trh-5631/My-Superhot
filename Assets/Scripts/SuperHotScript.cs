@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using DG.Tweening;
 
 public class SuperHotScript : MonoBehaviour
@@ -20,7 +21,6 @@ public class SuperHotScript : MonoBehaviour
     public LayerMask weaponLayer;
     [SerializeField] public float pickupDistance = 2.5f; // 新增：可调节的拾取距离（推荐 3 到 4 米）
 
-
     [Space]
     [Header("UI")]
     public Image indicator;
@@ -30,6 +30,16 @@ public class SuperHotScript : MonoBehaviour
     public GameObject hitParticlePrefab;
     public GameObject bulletPrefab;
 
+    [Space]
+    [Header("Player Health & Debug Backdoor")]
+    [Tooltip("无敌模式开关：勾选后玩家免疫任何伤害")]
+    public bool isGodMode = false;
+    [Tooltip("演示用无敌模式切换键")]
+    public KeyCode godModeToggleKey = KeyCode.G;
+    [Tooltip("视野变暗所需的全局全屏黑布 UI")]
+    public Image fadeImage;
+
+    private bool isPlayerDead = false; // 内部死亡锁：防止一帧内多发子弹重复触发死亡协程
 
     private void Awake()
     {
@@ -46,6 +56,21 @@ public class SuperHotScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // ==================== 0. 无敌模式后门检测 ====================
+        if (Input.GetKeyDown(godModeToggleKey))
+        {
+            isGodMode = !isGodMode;
+            Debug.Log($"【后门日志】玩家无敌模式状态已切换为: {isGodMode}");
+        }
+
+        // ==================== 1. 玩家死亡拦截线 ====================
+        if (isPlayerDead)
+        {
+            // 死亡演播期间，强行让时间流速平滑收敛至极慢速（3%），并切断所有玩家输入
+            Time.timeScale = Mathf.Lerp(Time.timeScale, 0.03f, 0.1f);
+            return;
+        }
+
         if (Input.GetKeyDown(KeyCode.R))
         {
             UnityEngine.SceneManagement.SceneManager.LoadSceneAsync(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
@@ -146,5 +171,44 @@ public class SuperHotScript : MonoBehaviour
     public Vector3 SpawnPos()
     {
         return bulletSpawner != null ? bulletSpawner.position : transform.position;
+    }
+
+    // ==================== 玩家伤害与死亡状态控制 ====================
+    /// <summary>
+    /// 供外部子弹或近战射线调用的唯一受击入口
+    /// </summary>
+    public void TakeDamage()
+    {
+        // 如果开启了无敌后门，或者已经处于死亡转场中，直接安全拦截
+        if (isGodMode || isPlayerDead) return;
+
+        StartCoroutine(PlayerDeathRoutine());
+    }
+
+    private IEnumerator PlayerDeathRoutine()
+    {
+        isPlayerDead = true;
+        canShoot = false; // 剥夺武器开火与控制权
+
+        // 动态兜底：如果忘记在 Inspector 中挂载 fadeImage，则尝试在当前场景中通过名字寻找
+        if (fadeImage == null)
+        {
+            GameObject go = GameObject.Find("FadeImage");
+            if (go != null) fadeImage = go.GetComponent<Image>();
+        }
+
+        if (fadeImage != null)
+        {
+            fadeImage.DOComplete();
+            // 核心细节：添加 .SetUpdate(true)，保证在游戏被强制减速时，黑屏依然按现实时间的 1.2 秒平滑完成
+            fadeImage.DOFade(1f, 1.2f).SetUpdate(true);
+        }
+
+        // 使用不受 Time.timeScale 影响的真实物理时间等待变暗演播
+        yield return new WaitForSecondsRealtime(1.5f);
+
+        // 重新加载当前激活的关卡场景
+        string currentSceneName = SceneManager.GetActiveScene().name;
+        SceneManager.LoadScene(currentSceneName);
     }
 }

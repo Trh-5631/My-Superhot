@@ -967,7 +967,7 @@ GameObject:
   - component: {fileID: 101920728}
   m_Layer: 9
   m_Name: Player (1)
-  m_TagString: Untagged
+  m_TagString: Player
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1000,6 +1000,9 @@ MonoBehaviour:
     type: 3}
   bulletPrefab: {fileID: 8914353279888130421, guid: 6e746ae9237f68243a2eb541a3b83455,
     type: 3}
+  isGodMode: 0
+  godModeToggleKey: 103
+  fadeImage: {fileID: 0}
 --- !u!114 &101920729
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -19,6 +19,18 @@ public class BulletMovement : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        // 优先判定：子弹是否撞击到了玩家本体或相机层级
+        if (collision.gameObject.CompareTag("Player") || collision.gameObject.CompareTag("MainCamera"))
+        {
+            if (SuperHotScript.instance != null)
+            {
+                SuperHotScript.instance.TakeDamage();
+            }
+
+            Destroy(gameObject); // 销毁子弹，防止穿透引发单发子弹重复判定
+            return;
+        }
+
         // 判定撞击到了敌人总体或其任何骨骼层级
         if (collision.gameObject.CompareTag("Enemy") || collision.gameObject.GetComponentInParent<EnemyScript>() != null)
         {

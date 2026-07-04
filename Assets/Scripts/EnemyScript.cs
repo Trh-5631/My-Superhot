@@ -89,30 +89,61 @@ public class EnemyScript : MonoBehaviour
     }
 
     // ==================== 新增：近战敌人挥砍逻辑 ====================
+    // ==================== 修改：近战敌人挥砍时序逻辑 ====================
+    // ==================== 彻底修复：完美契合 SUPERHOT 变速机制的近战动作时序 ====================
     void PerformMeleeAttack(Camera targetCam)
     {
         if (dead || targetCam == null) return;
-        // 1. 触发敌人的挥砍动画（原项目动画控制器中若有开火动作，可以直接复用或触发 Trigger）
+
+        // 1. 触发敌人的挥砍动画
         if (anim != null)
         {
-            anim.SetTrigger("shoot"); // 复用原版 shoot 触发器播放抬手/挥砍动作
+            anim.SetTrigger("shoot");
         }
-        // 2. 发射伤害射线：从敌人胸口向玩家方向刺出一击
-        RaycastHit hit;
-        Vector3 rayStart = transform.position + Vector3.up * 1.2f; // 敌人胸口高度
-        Vector3 rayDir = (targetCam.transform.position - rayStart).normalized;
 
-        if (Physics.Raycast(rayStart, rayDir, out hit, attackRange))
+        // 2. 开启时序协程：使用游戏内的动态流速时间进行延迟
+        StartCoroutine(MeleeDamageTimingRoutine());
+    }
+
+    private IEnumerator MeleeDamageTimingRoutine()
+    {
+        // 🚨【终极修复点】：必须使用 WaitForSeconds，严禁使用 Realtime！
+        // 这里的 0.3f 代表挥砍动画在【标准100%流速下】砍下来的时间。
+        // 当时间变为 3% 的极慢速时，这个等待时间会自动拉长 33 倍，确保伤害判定与由于时停变慢的动画完全同步！
+        yield return new WaitForSeconds(0.8f);
+
+        // 3. 安全检查：如果在等待期间敌人已经中弹变成布娃娃（dead），或者玩家已经触发死亡，则直接拦截判定
+        if (dead || SuperHotScript.instance == null) yield break;
+
+        // 4. 动画真正砍下来这一帧，执行球体空间范围检测
+        Vector3 attackCenter = transform.position + Vector3.up * 1.2f;
+        Collider[] hitColliders = Physics.OverlapSphere(attackCenter, attackRange);
+
+        bool playerHit = false;
+
+        foreach (var hitCollider in hitColliders)
         {
-            // 如果击中了玩家（根据原项目的玩家 Tag，通常是 "Player" 或 MainCamera）
-            if (hit.transform.CompareTag("Player") || hit.transform.CompareTag("MainCamera"))
+            if (hitCollider.CompareTag("Player") ||
+                hitCollider.CompareTag("MainCamera") ||
+                hitCollider.GetComponentInParent<SuperHotScript>() != null)
             {
-                Debug.Log("💥 玩家被近战敌人砍中了！");
-                // 预留位置：后续在这里调用玩家的死亡/掉血函数
-                // PlayerScript.instance.Die();
+                playerHit = true;
+                break;
             }
         }
+
+        // 5. 判定最终挥砍物理结果
+        if (playerHit)
+        {
+            Debug.Log("💥 [近战判定成功] 敌人的动作与流速完美匹配，实实在在地砍中了范围内的玩家！");
+            SuperHotScript.instance.TakeDamage();
+        }
+        else
+        {
+            Debug.Log("💨 [近战未命中] 敌人刀砍下了，但玩家通过动态走位成功闪开了这记挥砍。");
+        }
     }
+
     public void Ragdoll()
     {
         // 【工业级金闸门】：核心拦截防火墙！
