@@ -995,7 +995,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   pickupDistance: 2.3
-  indicator: {fileID: 0}
+  indicator: {fileID: 1410350612}
   hitParticlePrefab: {fileID: 2462045763441574653, guid: bc20e11fe125f0c4985a160e93e1a272,
     type: 3}
   bulletPrefab: {fileID: 8914353279888130421, guid: 6e746ae9237f68243a2eb541a3b83455,
@@ -11293,6 +11293,11 @@ PrefabInstance:
       propertyPath: m_Materials.Array.data[0]
       value: 
       objectReference: {fileID: 2100000, guid: 3021bb4175fe5b0408baa91e3566485e, type: 2}
+    - target: {fileID: 7013800461563675162, guid: 010ecbe63c90b0d43b7197394633e496,
+        type: 3}
+      propertyPath: nextSceneName
+      value: 00_MainMenu
+      objectReference: {fileID: 0}
     - target: {fileID: 7013800461563675162, guid: 010ecbe63c90b0d43b7197394633e496,
         type: 3}
       propertyPath: missionCompleteText

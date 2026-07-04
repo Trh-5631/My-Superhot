@@ -112,16 +112,20 @@ public class SuperHotScript : MonoBehaviour
             }
         }
 
-        // ==================== SUPERHOT 核心时间缩放机制 ====================
+        // ==================== 本游戏核心时间缩放机制 ====================
+        // 核心时间流速平滑拟合状态机算法片段
         float x = Input.GetAxisRaw("Horizontal");
         float y = Input.GetAxisRaw("Vertical");
 
+        // 行为状态分流判定：若存在位移输入则目标为常速，否则收敛至3%的极慢速
         float time = (x != 0 || y != 0) ? 1f : .03f;
         float lerpTime = (x != 0 || y != 0) ? .05f : .5f;
 
+        // 攻击短时序状态锁覆盖
         time = action ? 1 : time;
         lerpTime = action ? .1f : lerpTime;
 
+        // 跨越时间轴的平滑插值计算
         Time.timeScale = Mathf.Lerp(Time.timeScale, time, lerpTime);
     }
 

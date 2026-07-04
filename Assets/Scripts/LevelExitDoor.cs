@@ -214,6 +214,14 @@ public class LevelExitDoor : MonoBehaviour
 
         if (!string.IsNullOrEmpty(nextSceneName))
         {
+            // ==================== ✨ 新增：拦截并记录通关状态 ====================
+            // 在正式加载主菜单场景前，如果全局管理器活着，将其置为 true
+            if (GlobalBGMManager.Instance != null)
+            {
+                GlobalBGMManager.Instance.isDemoCompletedViaPortal = true;
+            }
+            // ====================================================================
+
             // 异步加载新关卡，彻底清洗内存
             SceneManager.LoadScene(nextSceneName);
         }

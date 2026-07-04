@@ -17,6 +17,11 @@ public class GlobalBGMManager : MonoBehaviour
     [Tooltip("音乐淡变的时间（秒），0.8 - 1.2秒最舒适")]
     public float fadeDuration = 1.0f;
 
+    // ==================== ✨ 新增：Demo通关状态防火墙 ====================
+    [System.NonSerialized]
+    public bool isDemoCompletedViaPortal = false; // 内部标记：仅在玩家从最终关传送门离开时置为 true
+    // ====================================================================
+
     private float targetBattleVolume;
 
     void Awake()
